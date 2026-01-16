@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedWord, Word, Proficiency } from '../types';
 import { parseContentWithGemini } from '../services/geminiService';
 import { Loader2, Plus, Download, RefreshCw, FileText, CheckCircle, RotateCw, Trash2 } from 'lucide-react';

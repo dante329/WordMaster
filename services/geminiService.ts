@@ -1,5 +1,5 @@
 import { ParsedWord } from "../types";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // --- Utility: JSONP for Youdao (Bypasses CORS for speed) ---
 const fetchJsonp = (url: string, callbackName: string = 'jsonp_callback'): Promise<any> => {
@@ -73,41 +73,39 @@ const youdaoLookup = async (term: string): Promise<ParsedWord | null> => {
 export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
   if (!term.trim()) return null;
 
-  const apiKey = process.env.API_KEY;
+  // 使用 as any 强制避开 TypeScript 对 import.meta 的检查
+  const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
     try {
       console.log("Calling Gemini API for:", term);
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const genAI = new GoogleGenerativeAI(apiKey);
       
-      const prompt = `Explain the English word "${term}" for a vocabulary learning app.
-        Return a valid JSON object with the following fields:
-        - term: The word itself
-        - definition: Concise Chinese definition (Simplified Chinese)
-        - example: A good English example sentence
-        - exampleTranslation: Chinese translation of the example
-        - phonetic: KK phonetic symbol (e.g. ˈæpəl)`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
-            type: Type.OBJECT,
+            type: SchemaType.OBJECT,
             properties: {
-              term: { type: Type.STRING },
-              definition: { type: Type.STRING },
-              example: { type: Type.STRING },
-              exampleTranslation: { type: Type.STRING },
-              phonetic: { type: Type.STRING }
+              term: { type: SchemaType.STRING },
+              definition: { type: SchemaType.STRING },
+              example: { type: SchemaType.STRING },
+              exampleTranslation: { type: SchemaType.STRING },
+              phonetic: { type: SchemaType.STRING }
             },
             required: ['term', 'definition', 'example']
           }
         }
       });
       
-      const text = response.text;
+      const prompt = `Explain the English word "${term}" for a vocabulary learning app.
+        Return a valid JSON object with the following fields: term, definition, example, exampleTranslation, phonetic. 
+        Use Simplified Chinese for definitions and translations.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
       
       if (text) {
         const data = JSON.parse(text);
@@ -123,15 +121,12 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
     } catch (error: any) {
       console.error("Gemini lookup failed. Error details:", error);
     }
-  } else {
-    console.warn("No API_KEY found. Skipping Gemini.");
   }
   return youdaoLookup(term);
 };
 
 // --- Helper: Fallback Extraction Strategy ---
 const simpleExtractAndLookup = async (text: string): Promise<ParsedWord[]> => {
-  console.warn("Using simple fallback extraction...");
   const rawWords = text.match(/[a-zA-Z]{3,}/g) || [];
   const stopWords = new Set(['the','and','that','have','for','not','with','you','this','but','his','from','they','we','say','her','she','will','an','my','one','all','would','there','their','what','so','up','out','if','about','who','get','which','go','me','when','make','can','like','time','no','just','him','know','take','people','into','year','your','good','some','could','them','see','other','than','then','now','look','only','come','its','over','think','also','back','after','use','two','how','our','work','first','well','way','even','new','want','because','any','these','give','day','most','us']);
   
@@ -161,40 +156,32 @@ const simpleExtractAndLookup = async (text: string): Promise<ParsedWord[]> => {
 
 // --- Google Gemini Implementation for Document Parsing ---
 export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]> => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 
   if (!apiKey) {
-    console.warn("Parsing skipped: No API Key.");
     return simpleExtractAndLookup(text);
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const genAI = new GoogleGenerativeAI(apiKey);
     
-    const prompt = `
-    Analyze the following text and extract key English vocabulary words that are valuable for a learner.
-    Text to analyze:
-    "${text.slice(0, 5000)}" 
-    `;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: SchemaType.OBJECT,
           properties: {
             words: {
-              type: Type.ARRAY,
+              type: SchemaType.ARRAY,
               items: {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
-                  term: { type: Type.STRING },
-                  definition: { type: Type.STRING },
-                  example: { type: Type.STRING },
-                  exampleTranslation: { type: Type.STRING },
-                  phonetic: { type: Type.STRING }
+                  term: { type: SchemaType.STRING },
+                  definition: { type: SchemaType.STRING },
+                  example: { type: SchemaType.STRING },
+                  exampleTranslation: { type: SchemaType.STRING },
+                  phonetic: { type: SchemaType.STRING }
                 },
                 required: ['term', 'definition', 'example']
               }
@@ -203,8 +190,12 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
         }
       }
     });
+    
+    const prompt = `Analyze the following text and extract key English vocabulary words: "${text.slice(0, 5000)}"`;
 
-    const jsonText = response.text;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const jsonText = response.text();
 
     if (!jsonText) throw new Error("Empty response from AI");
 
@@ -222,10 +213,6 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
 
   } catch (error: any) {
     console.error("Gemini Parsing Error:", error);
-    if (error.status === 403 || error.message?.includes('Region') || error.toString().includes('403')) {
-        alert("Google AI 服务连接失败 (Error 403)。\n请确保您的网络环境支持访问 Google API。已切换到基础提取模式。");
-        return simpleExtractAndLookup(text);
-    }
     return simpleExtractAndLookup(text);
   }
 };
