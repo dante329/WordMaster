@@ -3,10 +3,10 @@ import { ParsedWord } from "../types";
 // --- DeepSeek 配置 ---
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
-// --- 1. 单词查询 (Quick Lookup) ---
 export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
   if (!term.trim()) return null;
 
+  // 确保这里只声明一次 apiKey
   const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
 
   try {
@@ -27,21 +27,25 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
             role: "user",
             content: `Explain "${term}" in Chinese. Format: {"term": "${term}", "definition": "...", "phonetic": "...", "example": "...", "exampleTranslation": "..."}`
           }
-        ],
-        response_format: { type: 'json_object' }
+        ]
       })
     });
 
-    const result = await response.json();
-    const data = JSON.parse(result.choices[0].message.content);
+    const result: any = await response.json();
+    if (!result.choices || result.choices.length === 0) return null;
+    
+    const content = result.choices[0].message.content;
+    // 兼容可能带有 Markdown 代码块包裹的情况
+    const cleanJson = content.replace(/```json|```/g, "");
+    const data = JSON.parse(cleanJson);
+    
     return { ...data, selected: true };
   } catch (error) {
     console.error("DeepSeek lookup failed:", error);
-    return null; // 这里可以接之前的 Youdao Fallback
+    return null;
   }
 };
 
-// --- 2. 文本解析 (Document Parsing) ---
 export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]> => {
   const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
 
@@ -63,16 +67,60 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
             role: "user",
             content: `Analyze this text: ${text.slice(0, 2000)}`
           }
+        ]
+      })
+    });
+
+    const result: any = await response.json();
+    const content = result.choices[0].message.content;
+    const cleanJson = content.replace(/```json|```/g, "");
+    const data = JSON.parse(cleanJson);
+    
+    return data.words.map((w: any) => ({ ...w, selected: true }));
+  } catch (error) {
+    console.error("DeepSeek parsing failed:", error);
+    return [];
+  }
+};
+
+// --- 3. 获取搜索建议 (修正后的版本，匹配 Dashboard 的类型要求) ---
+export const getSearchSuggestions = async (text: string): Promise<{ term: string; definition: string }[]> => {
+  if (!text.trim()) return [];
+
+  const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
+
+  try {
+    const response = await fetch(DEEPSEEK_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: "You are a vocabulary assistant. Return ONLY a JSON object with a 'suggestions' key containing an array of objects with 'term' and 'definition' (in Chinese)."
+          },
+          {
+            role: "user",
+            content: `Provide 5 word suggestions starting with "${text}". Format: {"suggestions": [{"term": "...", "definition": "..."}]}`
+          }
         ],
         response_format: { type: 'json_object' }
       })
     });
 
-    const result = await response.json();
-    const data = JSON.parse(result.choices[0].message.content);
-    return data.words.map((w: any) => ({ ...w, selected: true }));
+    const result: any = await response.json();
+    const content = result.choices[0].message.content;
+    const cleanJson = content.replace(/```json|```/g, "");
+    const data = JSON.parse(cleanJson);
+    
+    // 返回 Dashboard 需要的 [{term, definition}] 格式
+    return data.suggestions || [];
   } catch (error) {
-    console.error("DeepSeek parsing failed:", error);
+    console.error("Suggestions failed:", error);
     return [];
   }
 };
