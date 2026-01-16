@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Settings } from '../types';
-import { ExternalLink, ShieldAlert, CreditCard } from 'lucide-react';
+import { ExternalLink, ShieldAlert, CreditCard, Download, Upload, Save, AlertTriangle } from 'lucide-react';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -9,8 +9,58 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, apiKey }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportData = () => {
+    const data = {
+      words: localStorage.getItem('wordmaster_words'),
+      stats: localStorage.getItem('wordmaster_stats'),
+      settings: localStorage.getItem('wordmaster_settings'),
+      timestamp: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `wordmaster_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const data = JSON.parse(text);
+
+        if (data.words && data.stats && data.settings) {
+          if (confirm('警告：导入备份将覆盖当前所有的学习进度和词库。\n\n确定要继续吗？')) {
+            localStorage.setItem('wordmaster_words', data.words);
+            localStorage.setItem('wordmaster_stats', data.stats);
+            localStorage.setItem('wordmaster_settings', data.settings);
+            alert('数据恢复成功！页面即将刷新。');
+            window.location.reload();
+          }
+        } else {
+          alert('无效的备份文件。请确保上传的是 WordMaster 导出的 JSON 文件。');
+        }
+      } catch (err) {
+        alert('文件解析失败，请重试。');
+      }
+    };
+    reader.readAsText(file);
+    // Reset value so same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="p-8 max-w-3xl mx-auto pb-20">
       <h2 className="text-2xl font-bold text-gray-900 mb-8">设置</h2>
       
       <div className="space-y-6">
@@ -81,6 +131,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdate, 
                  </button>
                </div>
             </div>
+          </div>
+        </div>
+
+        {/* Data Management Section */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Save className="w-5 h-5" />
+            数据管理
+          </h3>
+          <p className="text-sm text-gray-500 mb-6">
+            您的学习数据存储在当前浏览器的本地缓存中。建议定期备份，防止清理缓存导致数据丢失。
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+              onClick={handleExportData}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 font-semibold rounded-xl hover:bg-indigo-100 transition-colors border border-indigo-200"
+            >
+              <Download className="w-5 h-5" />
+              备份数据 (导出)
+            </button>
+            
+            <label className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors border border-gray-300 cursor-pointer">
+              <Upload className="w-5 h-5" />
+              恢复数据 (导入)
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept=".json" 
+                className="hidden" 
+                onChange={handleImportData}
+              />
+            </label>
+          </div>
+          
+          <div className="mt-4 flex items-start gap-2 text-xs text-orange-600 bg-orange-50 p-3 rounded-lg">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <p>注意：导入数据会完全覆盖当前的词库和学习进度，请谨慎操作。</p>
           </div>
         </div>
 
