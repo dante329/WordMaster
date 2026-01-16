@@ -1,0 +1,5 @@
+{
+  "name": "WordMaster",
+  "description": "由 Google Gemini 驱动的文档解析与有道词典支持的沉浸式背单词应用。",
+  "requestFramePermissions": []
+}
