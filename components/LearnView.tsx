@@ -123,8 +123,13 @@ export const LearnView: React.FC<LearnViewProps> = ({ queue, settings, onReview,
                   animate={{ opacity: 1 }}
                   className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl"
                 >
-                  <div className="text-2xl text-white font-medium mb-6 leading-relaxed">
-                    {currentWord.definition}
+                  <div className="text-2xl text-white font-medium mb-6 leading-relaxed flex items-center justify-center gap-2">
+                    {currentWord.partOfSpeech && (
+                        <span className="text-lg italic text-indigo-300 font-serif self-start mt-1">
+                            {currentWord.partOfSpeech}
+                        </span>
+                    )}
+                    <span>{currentWord.definition}</span>
                   </div>
                   
                   <div className="bg-black/20 rounded-xl p-6 text-left space-y-4">

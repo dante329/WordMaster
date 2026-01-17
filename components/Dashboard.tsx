@@ -101,6 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ words, stats, settings, on
     const newWord: Word = {
       id: crypto.randomUUID(),
       term: searchResult.term,
+      partOfSpeech: searchResult.partOfSpeech || '',
       definition: searchResult.definition,
       example: searchResult.example || '',
       exampleTranslation: searchResult.exampleTranslation || '',
@@ -141,6 +142,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ words, stats, settings, on
                       <h3 className="text-3xl font-bold text-gray-900 tracking-tight">
                         {searchResult.term}
                       </h3>
+                      {searchResult.partOfSpeech && (
+                        <span className="text-sm font-serif italic text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                          {searchResult.partOfSpeech}
+                        </span>
+                      )}
                       <button 
                           onClick={() => speakText(searchResult.term, settings.accent)}
                           className="p-1.5 rounded-full bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition-colors"

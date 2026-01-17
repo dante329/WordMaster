@@ -100,6 +100,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词
                   <div className="flex-1 min-w-0 pr-4">
                      <div className="flex items-center gap-3 flex-wrap">
                        <span className="font-bold text-lg text-gray-900 break-words">{word.term}</span>
+                       {word.partOfSpeech && (
+                         <span className="text-xs text-gray-500 italic bg-gray-100 px-1.5 py-0.5 rounded">{word.partOfSpeech}</span>
+                       )}
                        {word.phonetic && (
                          <span className="text-sm text-gray-400 font-mono bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">[{word.phonetic}]</span>
                        )}
@@ -159,7 +162,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词
         </div>
       </div>
 
-      {/* Edit Modal (保持不变) */}
+      {/* Edit Modal */}
       {editingWord && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 rounded-2xl">
            <form onSubmit={handleEditSave} className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -171,23 +174,37 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词
              </div>
              
              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
-               <div>
-                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">单词 (Term)</label>
-                 <div className="flex items-center gap-2">
+               <div className="flex gap-4">
+                 <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">单词 (Term)</label>
                     <input 
                         type="text" 
                         value={editingWord.term}
                         onChange={(e) => setEditingWord({...editingWord, term: e.target.value})}
-                        className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                         required
                     />
-                    {editingWord.phonetic && (
-                         <div className="px-3 py-2 bg-gray-100 rounded-lg text-gray-500 font-mono text-sm">
-                             [{editingWord.phonetic}]
-                         </div>
-                    )}
+                 </div>
+                 <div className="w-24">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">词性</label>
+                    <input 
+                        type="text" 
+                        placeholder="n."
+                        value={editingWord.partOfSpeech || ''}
+                        onChange={(e) => setEditingWord({...editingWord, partOfSpeech: e.target.value})}
+                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-medium text-center"
+                    />
                  </div>
                </div>
+               
+               {editingWord.phonetic && (
+                 <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">音标</label>
+                    <div className="px-3 py-2 bg-gray-100 rounded-lg text-gray-500 font-mono text-sm">
+                        [{editingWord.phonetic}]
+                    </div>
+                 </div>
+               )}
 
                <div>
                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">释义 (Definition)</label>

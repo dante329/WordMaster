@@ -29,12 +29,13 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
             role: "user",
             content: `请解释单词或短语 "${term}"。
             要求：
-            1. definition: 必须是中文简练释义。
-            2. example: 一个地道的英文例句。
-            3. exampleTranslation: 例句的中文翻译。
-            4. phonetic: 音标（如果是短语则留空）。
+            1. partOfSpeech: 词性缩写 (如 n., v., adj., adv.)。**如果是短语 (Phrase)，请务必返回空字符串 ""**。
+            2. definition: 必须是中文简练释义。
+            3. example: 一个地道的英文例句。
+            4. exampleTranslation: 例句的中文翻译。
+            5. phonetic: 音标（如果是短语则留空）。
             
-            返回格式: {"term": "${term}", "definition": "...", "phonetic": "...", "example": "...", "exampleTranslation": "..."}`
+            返回格式: {"term": "${term}", "partOfSpeech": "...", "definition": "...", "phonetic": "...", "example": "...", "exampleTranslation": "..."}`
           }
         ],
         response_format: { type: 'json_object' }
@@ -76,7 +77,8 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
             1. 如果文本本身就是"单词-释义"的列表（例如："apple: 苹果"），请严格保留原文的释义。
             2. 如果文本是文章，请提取生词并生成释义。
             3. **所有释义 (definition) 必须是中文**。
-            4. 返回格式必须是合法的 JSON 对象。`
+            4. **标注词性 (partOfSpeech)**: 对于单词，请提供标准缩写 (n., v., adj., etc.)。**对于短语 (Phrase)，该字段必须为空字符串 ""**。
+            5. 返回格式必须是合法的 JSON 对象。`
           },
           {
             role: "user",
@@ -92,6 +94,7 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
               "words": [
                 {
                   "term": "单词或短语", 
+                  "partOfSpeech": "词性缩写 (短语留空)",
                   "definition": "中文释义 (如果原文有上下文，请结合上下文)", 
                   "example": "包含该词的英文例句 (优先使用原文句子)", 
                   "exampleTranslation": "例句中文翻译", 
@@ -161,6 +164,8 @@ export const getSearchSuggestions = async (text: string): Promise<{ term: string
     return [];
   }
 };
+
+// 使用Gemini打开以下这一部分，注释上面的DeepSeek实现
 
 // import { ParsedWord } from "../types";
 
@@ -308,7 +313,7 @@ export const getSearchSuggestions = async (text: string): Promise<{ term: string
 //         results.push({
 //           ...wordInfo,
 //           selected: true,
-//           example: `Found in text: "${term}"`, 
+//           example: `Found in text: "${term}"`,
 //           exampleTranslation: '（自动提取单词，请手动补充例句）'
 //         });
 //       }

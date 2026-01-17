@@ -14,6 +14,7 @@ export interface Example {
 export interface Word {
   id: string;
   term: string;
+  partOfSpeech?: string; // New: e.g. 'n.', 'v.', 'adj.' or empty for phrases
   definition: string;
   phonetic?: string;
   example: string;
@@ -50,6 +51,7 @@ export interface UserStats {
 
 export interface ParsedWord {
   term: string;
+  partOfSpeech?: string; // New
   definition: string;
   example: string;
   exampleTranslation?: string;

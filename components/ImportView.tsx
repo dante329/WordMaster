@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ParsedWord, Word, Proficiency } from '../types';
 import { parseContentWithGemini } from '../services/geminiService';
 import { Loader2, Plus, Download, RefreshCw, FileText, CheckCircle, RotateCw, Trash2 } from 'lucide-react';
@@ -117,9 +116,9 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
   };
 
   const exportCSV = () => {
-    const headers = ["Term", "Definition", "Example", "Translation", "Phonetic"];
+    const headers = ["Term", "POS", "Definition", "Example", "Translation", "Phonetic"];
     const rows = parsedWords.filter(w => w.selected).map(w => 
-      `"${w.term}","${w.definition}","${w.example}","${w.exampleTranslation || ''}","${w.phonetic || ''}"`
+      `"${w.term}","${w.partOfSpeech || ''}","${w.definition}","${w.example}","${w.exampleTranslation || ''}","${w.phonetic || ''}"`
     );
     const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -149,6 +148,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
     const newWords: Word[] = selected.map(pw => ({
       id: crypto.randomUUID(),
       term: pw.term,
+      partOfSpeech: pw.partOfSpeech || '',
       definition: pw.definition,
       example: pw.example,
       exampleTranslation: pw.exampleTranslation,
@@ -252,7 +252,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
                 <th className="p-4 border-b w-12 text-center">
                   <input type="checkbox" checked={parsedWords.every(w => w.selected)} onChange={toggleAll} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
                 </th>
-                <th className="p-4 border-b font-semibold text-gray-600 w-48">单词</th>
+                <th className="p-4 border-b font-semibold text-gray-600 w-48">单词/词性</th>
                 <th className="p-4 border-b font-semibold text-gray-600">释义</th>
                 <th className="p-4 border-b font-semibold text-gray-600">例句</th>
               </tr>
@@ -264,7 +264,12 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
                     <input type="checkbox" checked={word.selected} onChange={() => toggleSelection(idx)} className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
                   </td>
                   <td className="p-4 font-medium text-gray-900">
-                    {word.term}
+                    <div className="flex items-center gap-2">
+                       <span>{word.term}</span>
+                       {word.partOfSpeech && (
+                         <span className="text-xs text-gray-500 italic bg-gray-100 px-1.5 py-0.5 rounded">{word.partOfSpeech}</span>
+                       )}
+                    </div>
                     {word.phonetic && <span className="block text-xs text-gray-400 font-mono mt-1">{word.phonetic}</span>}
                   </td>
                   <td className="p-4 text-gray-600">{word.definition}</td>
