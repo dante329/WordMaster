@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "WordMaster 是由 AI (DeepSeek/Gemini) 驱动的文档解析与沉浸式背单词应用。",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
