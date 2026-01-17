@@ -6,8 +6,6 @@
 
 应用内置了基于**艾宾浩斯遗忘曲线**的记忆算法（SRS），根据你对单词的熟悉程度智能推送复习，帮助你高效攻克生词。
 
-![WordMaster Preview](https://via.placeholder.com/800x400?text=WordMaster+Dashboard+Preview)
-
 ## ✨ 主要特性
 
 *   **🧠 AI 智能解析**: 支持接入 DeepSeek / Gemini，精准识别文本中的重点单词、短语和习语。
