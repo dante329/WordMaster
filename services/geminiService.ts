@@ -29,7 +29,7 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
             role: "user",
             content: `请解释单词或短语 "${term}"。
             要求：
-            1. partOfSpeech: 词性缩写 (如 n., v., adj., adv.)。**如果是短语 (Phrase)，请务必返回空字符串 ""**。
+            1. partOfSpeech: 词性缩写 (如 n., v., adj., adv.)。**如果是短语 (Phrase)，请务必返回空字符串 ""**。**如果是单词，必须返回词性**。
             2. definition: 必须是中文简练释义。
             3. example: 一个地道的英文例句。
             4. exampleTranslation: 例句的中文翻译。
@@ -59,6 +59,17 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
 export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]> => {
   const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
 
+  // 动态计算目标词汇量
+  // 逻辑：大约每 150 个字符包含一个有价值的生词。
+  // 下限：至少提取 5 个。
+  // 上限：为了保证 JSON 格式不被截断和 API 响应稳定性，限制在 120 个左右。
+  const textLen = text.length;
+  const estimatedCount = Math.floor(textLen / 150); 
+  
+  // 范围：最少 5 个，最多 120 个 (对于超长文本，单次请求 120 个 JSON 对象已是 DeepSeek/LLM 的稳定极限)
+  const minWords = Math.max(5, Math.min(100, Math.floor(estimatedCount * 0.8)));
+  const maxWords = Math.max(10, Math.min(120, estimatedCount));
+
   try {
     const response = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
@@ -75,18 +86,21 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
             
             重要规则：
             1. 如果文本本身就是"单词-释义"的列表（例如："apple: 苹果"），请严格保留原文的释义。
-            2. 如果文本是文章，请提取生词并生成释义。
+            2. 如果文本是文章，请根据文章长度提取尽可能多的生词（Word）和短语（Phrase）。
             3. **所有释义 (definition) 必须是中文**。
-            4. **标注词性 (partOfSpeech)**: 对于单词，请提供标准缩写 (n., v., adj., etc.)。**对于短语 (Phrase)，该字段必须为空字符串 ""**。
+            4. **标注词性 (partOfSpeech)**: 对于单词，请务必提供标准缩写 (n., v., adj., etc.)。**对于短语 (Phrase)，该字段必须为空字符串 ""**。
             5. 返回格式必须是合法的 JSON 对象。`
           },
           {
             role: "user",
-            content: `请分析以下文本，提取 10-20 个有价值的单词或短语（Phrase）。
+            content: `请分析以下文本。
+            
+            **数量要求**：根据文本长度，请提取大约 **${minWords} 到 ${maxWords} 个** 有价值的单词或短语。
+            (检测到文本长度为 ${textLen} 字符，请确保提取数量覆盖文中的主要生词，不要遗漏)。
             
             文本内容: 
             """
-            ${text.slice(0, 3000)}
+            ${text.slice(0, 30000)}
             """
             
             返回 JSON 格式: 
@@ -118,7 +132,6 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
     return (data.words || []).map((w: any) => ({ ...w, selected: true }));
   } catch (error) {
     console.error("DeepSeek parsing failed:", error);
-    // 失败时返回空数组，让前端处理（ImportView 会显示错误信息）
     throw error;
   }
 };

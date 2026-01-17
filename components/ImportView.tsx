@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ParsedWord, Word, Proficiency } from '../types';
 import { parseContentWithGemini } from '../services/geminiService';
-import { Loader2, Plus, Download, RefreshCw, FileText, CheckCircle, RotateCw, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Download, RefreshCw, FileText, Trash2, RotateCw } from 'lucide-react';
 import { SAMPLE_TEXTS } from '../constants';
 import mammoth from 'mammoth';
 
@@ -21,6 +21,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
     return (localStorage.getItem('wordmaster_import_step') as 'input' | 'preview') || 'input';
   });
   const [error, setError] = useState<string | null>(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
   
   // Track sample text index locally (no need to persist this strictly, but we can)
   const [sampleIndex, setSampleIndex] = useState(0);
@@ -53,39 +54,65 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setError(null);
-    const fileName = file.name.toLowerCase();
+    setLoadingFiles(true);
 
-    if (fileName.endsWith('.docx')) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const arrayBuffer = event.target?.result as ArrayBuffer;
-        try {
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          setInputText(result.value);
-          if (result.messages.length > 0) {
-            console.warn("Mammoth warning:", result.messages);
-          }
-        } catch (err) {
-          console.error(err);
-          setError("无法解析 .docx 文件，请确保文件未损坏。");
+    const fileReaders: Promise<string>[] = [];
+
+    Array.from(files).forEach(file => {
+      const fileName = file.name.toLowerCase();
+      
+      const p = new Promise<string>((resolve) => {
+        if (fileName.endsWith('.docx')) {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const arrayBuffer = event.target?.result as ArrayBuffer;
+            try {
+              const result = await mammoth.extractRawText({ arrayBuffer });
+              resolve(result.value);
+            } catch (err) {
+              console.error(`Error reading ${fileName}:`, err);
+              resolve(""); // Skip invalid files
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        } else if (fileName.endsWith('.txt')) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            resolve(event.target?.result as string || "");
+          };
+          reader.readAsText(file);
+        } else {
+          // Unsupported type
+          resolve("");
         }
-      };
-      reader.readAsArrayBuffer(file);
-    } else if (fileName.endsWith('.txt')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        setInputText(text);
-      };
-      reader.readAsText(file);
-    } else if (fileName.endsWith('.doc')) {
-      setError("暂不支持旧版 .doc 文件，请先转换为 .docx 或 .txt 格式。");
-    } else {
-      setError("不支持该文件格式，请上传 .txt 或 .docx 文件。");
+      });
+      fileReaders.push(p);
+    });
+
+    try {
+      const results = await Promise.all(fileReaders);
+      const validTexts = results.filter(t => t.trim().length > 0);
+      
+      if (validTexts.length > 0) {
+        const separator = "\n\n" + "=".repeat(10) + " 下一篇文档 " + "=".repeat(10) + "\n\n";
+        setInputText(prev => {
+          const prefix = prev.trim() ? prev + separator : "";
+          return prefix + validTexts.join(separator);
+        });
+      } else {
+        setError("未从选中文件中提取到有效文本，请检查文件格式 (.txt/.docx)。");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("读取文件时发生错误。");
+    } finally {
+      setLoadingFiles(false);
+      // Clear input so same files can be selected again if needed
+      e.target.value = '';
     }
   };
 
@@ -177,15 +204,22 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
     return (
       <div className="p-8 max-w-5xl mx-auto h-full flex flex-col">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">导入学习素材</h2>
-        <p className="text-gray-500 mb-6">粘贴文章文本，或者上传 .txt / .docx 文档。AI 将自动提取词汇并生成例句。</p>
+        <p className="text-gray-500 mb-6">支持批量导入多个文档 (.txt, .docx)，AI 将自动合并分析并提取词汇。</p>
 
         <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex flex-col gap-4">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                <FileText className="w-5 h-5 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">加载文件 (.txt, .docx)</span>
-                <input type="file" accept=".txt,.docx,.doc" onChange={handleFileUpload} className="hidden" />
+              <label className={`flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${loadingFiles ? 'opacity-50 cursor-wait' : ''}`}>
+                {loadingFiles ? <Loader2 className="w-5 h-5 animate-spin text-indigo-500" /> : <FileText className="w-5 h-5 text-gray-500" />}
+                <span className="text-sm font-medium text-gray-700">{loadingFiles ? '正在读取...' : '批量加载文件 (支持多选)'}</span>
+                <input 
+                  type="file" 
+                  accept=".txt,.docx,.doc" 
+                  multiple 
+                  onChange={handleFileUpload} 
+                  disabled={loadingFiles}
+                  className="hidden" 
+                />
               </label>
               <button onClick={handleSampleText} className="text-sm flex items-center gap-2 text-indigo-600 hover:text-indigo-700 hover:underline px-2 py-2">
                 <RotateCw className="w-4 h-4" />
@@ -202,7 +236,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="请在此粘贴文本，或导入文档内容..."
+            placeholder="请在此粘贴文本，或点击上方按钮批量导入文档..."
             className="flex-1 w-full p-4 border border-gray-200 rounded-xl resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-gray-700 leading-relaxed custom-scrollbar"
           />
 
@@ -215,7 +249,7 @@ export const ImportView: React.FC<ImportViewProps> = ({ onAddWords }) => {
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-semibold shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-              {isProcessing ? '正在分析...' : 'AI 智能提取'}
+              {isProcessing ? '正在智能分析...' : 'AI 提取单词'}
             </button>
           </div>
         </div>
