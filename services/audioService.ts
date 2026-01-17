@@ -1,24 +1,93 @@
-// Simple audio service using Base64 encoded sounds to avoid external dependency issues.
-// Sounds are soft, game-like UI effects.
+// Audio service using Web Audio API to generate high-quality UI sounds procedurally.
+// This ensures sound works 100% of the time without external files or broken Base64 strings.
 
-// Base64 encoded MP3s (Short, small file size)
-const SOUNDS = {
-  // A pleasant "Ding"
-  correct: "data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQxAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxBsAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxCYAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxDEAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxD0AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxEoAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxFcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxGMAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxG4AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxHkAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxIUAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxJAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxJsAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxKcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxLMAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxL4AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxMkAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxNQAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxOAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxOwAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxPgAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA",
-  
-  // A soft "Thud" or "Bloop" for incorrect
-  wrong: "data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQxAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxBsAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxCYAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxDEAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxD0AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxEoAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxFcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxGMAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxG4AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA",
-  
-  // A neutral "Pop" for blur/unsure
-  blur: "data:audio/mp3;base64,SUQzBAAAAAABAFRYWFgAAAASAAADbWFqb3JfYnJhbmQAZGFzaABUWFhYAAAAEQAAA21pbm9yX3ZlcnNpb24AMABUWFhYAAAAHAAAA2NvbXBhdGlibGVfYnJhbmRzAGlzbzZtcDQxAFRTU0UAAAAPAAADTGF2ZjU5LjI3LjEwMAAAAAAAAAAAAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAAAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxAcAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxBsAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxCYAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxDEAAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA//tQxD0AAAAANIAAAAAExBTUUzLjEwMK8AAAANSSJADJAgAAANIAAAABQD/4lUAAAAAAAlUAAAA"
+let audioContext: AudioContext | null = null;
+
+// Initialize AudioContext lazily to comply with browser autoplay policies
+const getContext = () => {
+  if (!audioContext) {
+    // Cross-browser support
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    audioContext = new AudioContextClass();
+  }
+  return audioContext;
 };
 
 export const playFeedbackSound = (type: 'correct' | 'blur' | 'wrong') => {
   try {
-    const audio = new Audio(SOUNDS[type]);
-    audio.volume = 0.4; // 不太响
-    audio.play().catch(e => console.warn("Audio play blocked", e));
+    const ctx = getContext();
+    
+    // Ensure context is running (browser might suspend it until user interaction)
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const t = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+
+    if (type === 'correct') {
+      // Classic "Success" Chime: C5 -> E5 -> G5 (Major Chord Arpeggio)
+      // Creates a pleasant, positive "Ding" sound
+      [523.25, 659.25, 783.99].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        
+        osc.type = 'sine'; // Sine wave is soft and clean
+        osc.frequency.value = freq;
+        
+        osc.connect(oscGain);
+        oscGain.connect(masterGain);
+        
+        // Staggered start for arpeggio effect
+        const startTime = t + (i * 0.04);
+        
+        // Envelope: Attack -> Decay
+        oscGain.gain.setValueAtTime(0, startTime);
+        oscGain.gain.linearRampToValueAtTime(0.1, startTime + 0.02); // Quick attack
+        oscGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5); // Smooth decay
+        
+        osc.start(startTime);
+        osc.stop(startTime + 0.5);
+      });
+
+    } else if (type === 'wrong') {
+      // "Error" Thud: Low frequency triangle wave sliding down
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      
+      osc.type = 'triangle'; // Triangle has a bit more "buzz" than sine
+      osc.frequency.setValueAtTime(150, t);
+      osc.frequency.exponentialRampToValueAtTime(50, t + 0.2); // Pitch drop
+      
+      osc.connect(oscGain);
+      oscGain.connect(masterGain);
+      
+      oscGain.gain.setValueAtTime(0.15, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      
+      osc.start(t);
+      osc.stop(t + 0.2);
+
+    } else { // blur
+      // "Pop" / Select sound: Short high-pitch blip
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, t);
+      
+      osc.connect(oscGain);
+      oscGain.connect(masterGain);
+      
+      oscGain.gain.setValueAtTime(0.05, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      
+      osc.start(t);
+      osc.stop(t + 0.1);
+    }
+
   } catch (e) {
-    console.warn("Audio setup failed", e);
+    console.warn("Audio playback failed", e);
   }
 };
