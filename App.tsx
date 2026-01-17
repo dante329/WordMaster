@@ -30,7 +30,24 @@ const App: React.FC = () => {
   };
 
   const handleAddWords = (newWords: Word[]) => {
-    const updated = [...words, ...newWords];
+    // 查重逻辑
+    const existingTerms = new Set(words.map(w => w.term.toLowerCase().trim()));
+    const uniqueNewWords = newWords.filter(w => !existingTerms.has(w.term.toLowerCase().trim()));
+
+    if (uniqueNewWords.length === 0) {
+      alert("这些单词都已经存在于你的词库中了！");
+      return;
+    }
+
+    if (uniqueNewWords.length < newWords.length) {
+      const duplicateCount = newWords.length - uniqueNewWords.length;
+      alert(`已自动过滤 ${duplicateCount} 个重复单词，成功添加 ${uniqueNewWords.length} 个新词。`);
+    } else {
+      // 只有在没有重复时才不弹窗（或者根据你的需求，也可以不弹）
+      // 这里不做额外提示，交给 ImportView 处理成功提示
+    }
+
+    const updated = [...words, ...uniqueNewWords];
     setWords(updated);
     saveWords(updated);
     setView('library');
@@ -53,6 +70,17 @@ const App: React.FC = () => {
       const updated = words.filter(w => w.id !== id);
       setWords(updated);
       saveWords(updated);
+    }
+  };
+
+  // 新增：清空所有单词
+  const handleDeleteAllWords = () => {
+    if (confirm('⚠️ 高危操作：确定要清空所有单词吗？此操作无法撤销！')) {
+      if (confirm('请再次确认：真的要删除全部吗？')) {
+        setWords([]);
+        saveWords([]);
+        alert('词库已清空');
+      }
     }
   };
 
@@ -131,6 +159,7 @@ const App: React.FC = () => {
           title="词库管理"
           onToggleFavorite={handleToggleFavorite}
           onDelete={handleDeleteWord}
+          onDeleteAll={handleDeleteAllWords}
           onUpdate={handleUpdateWord}
         />
       )}
@@ -140,6 +169,8 @@ const App: React.FC = () => {
           title="我的收藏"
           onToggleFavorite={handleToggleFavorite}
           onDelete={handleDeleteWord}
+          // 收藏页面不需要清空所有功能，传入空或者 undefined 处理
+          onDeleteAll={() => {}} 
           onUpdate={handleUpdateWord}
         />
       )}
@@ -147,7 +178,7 @@ const App: React.FC = () => {
         <SettingsView 
           settings={settings} 
           onUpdate={updateSettings} 
-          apiKey={process.env.API_KEY || ''}
+          apiKey={(import.meta as any).env.VITE_DEEPSEEK_API_KEY || ''}
         />
       )}
     </Layout>

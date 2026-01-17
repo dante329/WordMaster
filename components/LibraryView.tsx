@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Word, Example } from '../types';
-import { Search, Star, Trash2, Edit2, Check, X, Plus, MinusCircle, Volume2 } from 'lucide-react';
+import { Search, Star, Trash2, Edit2, Check, X, Plus, MinusCircle, Volume2, AlertCircle } from 'lucide-react';
 import { speakText } from '../services/ttsService';
 
 interface LibraryViewProps {
@@ -8,10 +8,11 @@ interface LibraryViewProps {
   title?: string;
   onToggleFavorite: (id: string) => void;
   onDelete: (id: string) => void;
+  onDeleteAll?: () => void; // Optional, only for main library
   onUpdate: (updatedWord: Word) => void;
 }
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词本", onToggleFavorite, onDelete, onUpdate }) => {
+export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词本", onToggleFavorite, onDelete, onDeleteAll, onUpdate }) => {
   const [search, setSearch] = useState('');
   const [editingWord, setEditingWord] = useState<Word | null>(null);
 
@@ -61,17 +62,32 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词
 
   return (
     <div className="p-8 h-full flex flex-col relative">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-        <div className="relative">
-          <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="搜索单词或释义..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:ring-2 focus:ring-indigo-500 focus:outline-none w-64"
-          />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <h2 className="text-2xl font-bold text-gray-900">{title} <span className="text-sm font-normal text-gray-500 ml-2">({words.length} 词)</span></h2>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:flex-none">
+            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="搜索单词或释义..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-200 rounded-full focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full md:w-64"
+            />
+          </div>
+          
+          {/* 只有在主词库页面且有单词时才显示清空按钮 */}
+          {onDeleteAll && words.length > 0 && title === "词库管理" && (
+            <button 
+              onClick={onDeleteAll}
+              className="flex items-center gap-1 px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+              title="清空所有单词"
+            >
+              <Trash2 className="w-4 h-4" />
+              清空
+            </button>
+          )}
         </div>
       </div>
 
@@ -81,52 +97,69 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ words, title = "单词
             <div className="grid grid-cols-1 divide-y divide-gray-100">
               {filteredWords.map((word) => (
                 <div key={word.id} className="p-4 hover:bg-gray-50 flex items-center justify-between group transition-colors">
-                  <div className="flex-1">
-                     <div className="flex items-center gap-3">
-                       <span className="font-bold text-lg text-gray-900">{word.term}</span>
+                  <div className="flex-1 min-w-0 pr-4">
+                     <div className="flex items-center gap-3 flex-wrap">
+                       <span className="font-bold text-lg text-gray-900 break-words">{word.term}</span>
                        {word.phonetic && (
-                         <span className="text-sm text-gray-400 font-mono bg-gray-100 px-2 py-0.5 rounded">[{word.phonetic}]</span>
+                         <span className="text-sm text-gray-400 font-mono bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">[{word.phonetic}]</span>
                        )}
                        <button onClick={() => speakText(word.term)} className="text-gray-400 hover:text-indigo-600 transition-colors">
                          <Volume2 className="w-4 h-4" />
                        </button>
+                       {/* 显示熟练度标签 */}
+                       <span className={`text-xs px-2 py-0.5 rounded-full ${
+                         word.proficiency === 'Mastered' ? 'bg-green-100 text-green-700' :
+                         word.proficiency === 'Review' ? 'bg-yellow-100 text-yellow-700' :
+                         word.proficiency === 'Learning' ? 'bg-blue-100 text-blue-700' :
+                         'bg-gray-100 text-gray-500'
+                       }`}>
+                         {word.proficiency === 'New' ? '新词' : 
+                          word.proficiency === 'Learning' ? '学习中' :
+                          word.proficiency === 'Review' ? '复习' : '已掌握'}
+                       </span>
                      </div>
-                     <p className="text-gray-600 mt-1">{word.definition}</p>
-                     <p className="text-xs text-gray-400 mt-1 italic truncate max-w-2xl">{word.example}</p>
+                     <p className="text-gray-600 mt-1 break-words">{word.definition}</p>
+                     <p className="text-xs text-gray-400 mt-1 italic truncate">{word.example}</p>
                   </div>
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 md:gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                     <button 
                       onClick={() => setEditingWord(word)}
                       className="p-2 rounded-full hover:bg-indigo-50 text-gray-400 hover:text-indigo-500 transition-colors"
+                      title="编辑"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={() => onToggleFavorite(word.id)}
                       className={`p-2 rounded-full hover:bg-gray-200 transition-colors ${word.isFavorite ? 'text-yellow-400' : 'text-gray-400'}`}
+                      title="收藏"
                     >
-                      <Star className={`w-5 h-5 ${word.isFavorite ? 'fill-current' : ''}`} />
+                      <Star className={`w-4 h-4 ${word.isFavorite ? 'fill-current' : ''}`} />
                     </button>
                     <button 
                       onClick={() => onDelete(word.id)}
                       className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                      title="删除"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+            <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center">
               <Search className="w-12 h-12 mb-4 opacity-20" />
-              <p>未找到匹配 "{search}" 的单词</p>
+              <p>未找到单词。</p>
+              {words.length === 0 && (
+                <p className="text-sm mt-2 text-indigo-500">去导入一些单词或者添加新词吧！</p>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Modal (保持不变) */}
       {editingWord && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 rounded-2xl">
            <form onSubmit={handleEditSave} className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">

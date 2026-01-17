@@ -3,10 +3,12 @@ import { ParsedWord } from "../types";
 // --- DeepSeek 配置 ---
 const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
 
+// Helper: 延时函数，防止请求过快
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
   if (!term.trim()) return null;
 
-  // 确保这里只声明一次 apiKey
   const apiKey = (import.meta as any).env.VITE_DEEPSEEK_API_KEY;
 
   try {
@@ -21,13 +23,21 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
         messages: [
           {
             role: "system",
-            content: "You are a helpful English dictionary. Return ONLY a JSON object."
+            content: "你是一个专业的英汉词典助手。请返回纯 JSON 格式。"
           },
           {
             role: "user",
-            content: `Explain "${term}" in Chinese. Format: {"term": "${term}", "definition": "...", "phonetic": "...", "example": "...", "exampleTranslation": "..."}`
+            content: `请解释单词或短语 "${term}"。
+            要求：
+            1. definition: 必须是中文简练释义。
+            2. example: 一个地道的英文例句。
+            3. exampleTranslation: 例句的中文翻译。
+            4. phonetic: 音标（如果是短语则留空）。
+            
+            返回格式: {"term": "${term}", "definition": "...", "phonetic": "...", "example": "...", "exampleTranslation": "..."}`
           }
-        ]
+        ],
+        response_format: { type: 'json_object' }
       })
     });
 
@@ -35,8 +45,7 @@ export const quickLookup = async (term: string): Promise<ParsedWord | null> => {
     if (!result.choices || result.choices.length === 0) return null;
     
     const content = result.choices[0].message.content;
-    // 兼容可能带有 Markdown 代码块包裹的情况
-    const cleanJson = content.replace(/```json|```/g, "");
+    const cleanJson = content.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
     
     return { ...data, selected: true };
@@ -61,29 +70,56 @@ export const parseContentWithGemini = async (text: string): Promise<ParsedWord[]
         messages: [
           {
             role: "system",
-            content: "Extract key English vocabulary. Return JSON: {\"words\": [{\"term\": \"...\", \"definition\": \"...\", \"example\": \"...\", \"exampleTranslation\": \"...\", \"phonetic\": \"...\"}]}"
+            content: `你是一个英语学习助手。请分析用户提供的文本，提取其中的重点单词、固定搭配、短语或习语。
+            
+            重要规则：
+            1. 如果文本本身就是"单词-释义"的列表（例如："apple: 苹果"），请严格保留原文的释义。
+            2. 如果文本是文章，请提取生词并生成释义。
+            3. **所有释义 (definition) 必须是中文**。
+            4. 返回格式必须是合法的 JSON 对象。`
           },
           {
             role: "user",
-            content: `Analyze this text: ${text.slice(0, 2000)}`
+            content: `请分析以下文本，提取 10-20 个有价值的单词或短语（Phrase）。
+            
+            文本内容: 
+            """
+            ${text.slice(0, 3000)}
+            """
+            
+            返回 JSON 格式: 
+            {
+              "words": [
+                {
+                  "term": "单词或短语", 
+                  "definition": "中文释义 (如果原文有上下文，请结合上下文)", 
+                  "example": "包含该词的英文例句 (优先使用原文句子)", 
+                  "exampleTranslation": "例句中文翻译", 
+                  "phonetic": "音标 (可选)"
+                }
+              ]
+            }`
           }
-        ]
+        ],
+        response_format: { type: 'json_object' }
       })
     });
 
     const result: any = await response.json();
+    if (!result.choices || !result.choices[0]) throw new Error("API returned empty choices");
+
     const content = result.choices[0].message.content;
-    const cleanJson = content.replace(/```json|```/g, "");
+    const cleanJson = content.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
     
-    return data.words.map((w: any) => ({ ...w, selected: true }));
+    return (data.words || []).map((w: any) => ({ ...w, selected: true }));
   } catch (error) {
     console.error("DeepSeek parsing failed:", error);
-    return [];
+    // 失败时返回空数组，让前端处理（ImportView 会显示错误信息）
+    throw error;
   }
 };
 
-// --- 3. 获取搜索建议 (修正后的版本，匹配 Dashboard 的类型要求) ---
 export const getSearchSuggestions = async (text: string): Promise<{ term: string; definition: string }[]> => {
   if (!text.trim()) return [];
 
@@ -101,11 +137,13 @@ export const getSearchSuggestions = async (text: string): Promise<{ term: string
         messages: [
           {
             role: "system",
-            content: "You are a vocabulary assistant. Return ONLY a JSON object with a 'suggestions' key containing an array of objects with 'term' and 'definition' (in Chinese)."
+            content: "You are a vocabulary assistant. Return ONLY a JSON object."
           },
           {
             role: "user",
-            content: `Provide 5 word suggestions starting with "${text}". Format: {"suggestions": [{"term": "...", "definition": "..."}]}`
+            content: `Provide up to 5 English word suggestions starting with "${text}". 
+            Definition MUST be in Chinese.
+            Format: {"suggestions": [{"term": "word", "definition": "中文释义"}]}`
           }
         ],
         response_format: { type: 'json_object' }
@@ -114,10 +152,9 @@ export const getSearchSuggestions = async (text: string): Promise<{ term: string
 
     const result: any = await response.json();
     const content = result.choices[0].message.content;
-    const cleanJson = content.replace(/```json|```/g, "");
+    const cleanJson = content.replace(/```json|```/g, "").trim();
     const data = JSON.parse(cleanJson);
     
-    // 返回 Dashboard 需要的 [{term, definition}] 格式
     return data.suggestions || [];
   } catch (error) {
     console.error("Suggestions failed:", error);
